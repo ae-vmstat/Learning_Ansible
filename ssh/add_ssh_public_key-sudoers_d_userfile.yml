@@ -1,0 +1,35 @@
+- name: adding ssh public key, add sudoers.d userfile
+  hosts: ds
+  become: yes
+
+  vars:
+    users:
+      - name: System Administrator
+        username: sa
+        ssh: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFCxt83omdu8SxB2pmvvKLE+fdQDhLbks8H25bqtnAkG sa@ok key_for_git 
+
+  tasks:
+
+  - name: add ssh key
+    authorized_key:
+      user: "{{item.username}}"
+      key: "{{item.ssh}}"
+    loop: "{{users}}"
+
+  - name: add file with username to folder "/etc/sudoers.d"
+    file:
+      path: "/etc/sudoers.d/{{item.username}}"
+      state: touch
+      mode: 0440
+      owner: root
+      group: root
+    loop: "{{users}}"
+      
+  - name: add sudoers rules
+    copy:
+      dest: "/etc/sudoers.d/{{item.username}}"
+      content: |
+        # {{item.name}}
+        {{item.username}} ALL=(ALL) NOPASSWD:ALL
+    loop: "{{users}}"
+
