@@ -1,0 +1,9 @@
+- name: Ping all
+  hosts: all
+  become: yes
+
+  tasks:
+ 
+  - name: Task ping all
+    ping:
+
