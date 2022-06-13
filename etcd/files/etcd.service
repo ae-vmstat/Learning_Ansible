@@ -1,0 +1,10 @@
+[Unit]
+Description=etcd key-value store
+Documentation=https://github.com/etcd-io/etcd
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/etcd --config-file /usr/local/etc/etcd/etcd.conf.yaml
+Restart=always
+

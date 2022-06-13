@@ -1,0 +1,99 @@
+- name: etcd cluster create
+  #hosts: hpe
+  hosts: all
+  become: yes
+
+  vars:
+    files:
+      - file: etcdutl
+        bin_path: /usr/local/bin/
+      - file: etcdctl
+        bin_path: /usr/local/bin/
+      - file: etcd 
+        bin_path: /usr/local/bin/
+        
+  tasks:
+    
+    - name: Get etcd version from command
+      shell: curl -s https://api.github.com/repos/etcd-io/etcd/releases/latest|grep tag_name | cut -d '"' -f 4
+      args:
+        warn: false
+      register: command_output
+          
+    - set_fact:
+        etcd_version: "{{ command_output.stdout }}"
+        etcd_version_full: "etcd-{{ command_output.stdout }}-linux-amd64.tar.gz"
+        data_directory: /var/lib/etcd/
+        configuration_directory: /usr/local/etc/etcd/
+        configuration_file: etcd.conf.yaml
+
+    - name: "Download the tarball into the /tmp directory"
+      get_url:
+        url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version }}/{{ etcd_version_full }}"
+        dest: "/tmp/{{ etcd_version_full }}"
+        owner: root
+        group: root
+        mode: 0600
+        force: True
+
+    - name: "extract specific file(s) from tarball"
+      shell: tar -xzf "/tmp/{{ etcd_version_full }}" -C "{{item.bin_path}}" --no-anchored "{{item.file}}" --strip-components 1 
+      args:
+        warn: false 
+      loop: "{{files}}"
+   
+    - name: "Set permissions for files"
+      file:
+        path: "{{item.bin_path}}{{item.file}}"
+        state: file
+        owner: root
+        group: root
+        mode: 0700
+      loop: "{{files}}"
+
+    - name: "Create a etcd service"
+      copy:
+        src: files/etcd.service
+        remote_src: False
+        dest: /etc/systemd/system/etcd.service
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: "Stop the etcd service"
+      command: systemctl stop etcd
+
+    - name: "Create a data directory"
+      file:
+        path: "{{ data_directory }}{{ inventory_hostname }}.etcd"
+        #state: directory
+        state: "{{ item }}"
+        owner: root
+        group: root
+        mode: 0755
+      with_items:
+        - absent
+        - directory
+
+    - name: "Create configuration directory for etcd"
+      file:
+        path: "{{ configuration_directory }}"
+        state: directory
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: "Create configuration file for etcd"
+      template:
+        src: templates/etcd.conf.yaml.j2
+        dest: "{{ configuration_directory }}{{ configuration_file }}"
+        owner: root
+        group: root
+        mode: 0600
+    
+    - name: "Enable the etcd service"
+      command: systemctl enable etcd
+    
+    - name: "Start the etcd service"
+      command: systemctl restart etcd
+
